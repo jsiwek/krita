@@ -113,6 +113,13 @@
            </property>
           </widget>
          </item>
+         <item row="3" column="1">
+          <widget class="QCheckBox" name="chkFingerPainting">
+           <property name="text">
+            <string>Allow finger painting on touch screens (needs restart)</string>
+           </property>
+          </widget>
+         </item>
         </layout>
        </item>
        <item row="1" column="1">
@@ -693,11 +700,6 @@
    <class>KisColorButton</class>
    <extends>QPushButton</extends>
    <header>kis_color_button.h</header>
-  </customwidget>
-  <customwidget>
-   <class>KisIntParseSpinBox</class>
-   <extends>QSpinBox</extends>
-   <header>kis_int_parse_spin_box.h</header>
   </customwidget>
  </customwidgets>
  <resources/>

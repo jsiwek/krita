@@ -66,12 +66,14 @@ KisToolFreehand::KisToolFreehand(KoCanvasBase * canvas, const QCursor & cursor, 
       m_paintopBasedPickingInAction(false),
       m_brushResizeCompressor(200, std::bind(&KisToolFreehand::slotDoResizeBrush, this, _1))
 {
+
     m_assistant = false;
     m_magnetism = 1.0;
     m_only_one_assistant = true;
 
     setSupportOutline(true);
-    setMaskSyntheticEvents(true); // Disallow mouse events from finger presses.
+    KisConfig cfg;
+    setMaskSyntheticEvents(cfg.allowFingerPainting()); // Disallow mouse events from finger presses.
 
     m_infoBuilder = new KisToolFreehandPaintingInformationBuilder(this);
     m_recordingAdapter = new KisRecordingAdapter();

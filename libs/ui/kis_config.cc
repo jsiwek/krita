@@ -1722,3 +1722,13 @@ void KisConfig::setBrushHudSetting(const QString &value) const
 {
     m_cfg.writeEntry("brushHudSettings", value);
 }
+
+bool KisConfig::allowFingerPainting(bool defaultValue) const
+{
+    return defaultValue ? false : m_cfg.readEntry("allowFingerPainting", false);
+}
+
+void KisConfig::setAllowFingerPainting(bool value) const
+{
+    m_cfg.writeEntry("allowFingerPainting", value);
+}

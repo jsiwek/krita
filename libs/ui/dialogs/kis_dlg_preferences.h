@@ -73,6 +73,7 @@ public:
     void setDefault();
     int undoStackSize();
     bool showOutlineWhilePainting();
+    bool allowFingerPainting();
     bool hideSplashScreen();
     int mdiMode();
     int favoritePresets();

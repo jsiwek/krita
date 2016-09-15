@@ -113,6 +113,7 @@ GeneralTab::GeneralTab(QWidget *_parent, const char *_name)
     m_undoStackSize->setValue(cfg.undoStackLimit());
     m_backupFileCheckBox->setChecked(cfg.backupFile());
     m_showOutlinePainting->setChecked(cfg.showOutlineWhilePainting());
+    chkFingerPainting->setChecked(cfg.allowFingerPainting());
     m_hideSplashScreen->setChecked(cfg.hideSplashScreen());
     m_cmbMDIType->setCurrentIndex(cfg.readEntry<int>("mdi_viewmode", (int)QMdiArea::TabbedView));
     m_chkRubberBand->setChecked(cfg.readEntry<int>("mdi_rubberband", cfg.useOpenGL()));
@@ -144,6 +145,7 @@ void GeneralTab::setDefault()
     m_undoStackSize->setValue(cfg.undoStackLimit(true));
     m_backupFileCheckBox->setChecked(cfg.backupFile(true));
     m_showOutlinePainting->setChecked(cfg.showOutlineWhilePainting(true));
+    chkFingerPainting->setChecked(cfg.allowFingerPainting(true));
     m_hideSplashScreen->setChecked(cfg.hideSplashScreen(true));
     m_cmbMDIType->setCurrentIndex((int)QMdiArea::TabbedView);
     m_chkRubberBand->setChecked(cfg.useOpenGL(true));
@@ -189,6 +191,11 @@ int GeneralTab::undoStackSize()
 bool GeneralTab::showOutlineWhilePainting()
 {
     return m_showOutlinePainting->isChecked();
+}
+
+bool GeneralTab::allowFingerPainting()
+{
+    return chkFingerPainting->isChecked();
 }
 
 bool GeneralTab::hideSplashScreen()
@@ -962,6 +969,7 @@ bool KisDlgPreferences::editPreferences()
         cfg.setNewOutlineStyle(dialog->m_general->outlineStyle());
         cfg.setShowRootLayer(dialog->m_general->showRootLayer());
         cfg.setShowOutlineWhilePainting(dialog->m_general->showOutlineWhilePainting());
+        cfg.setAllowFingerPainting(dialog->m_general->allowFingerPainting());
         cfg.setHideSplashScreen(dialog->m_general->hideSplashScreen());
         cfg.writeEntry<int>("mdi_viewmode", dialog->m_general->mdiMode());
         cfg.setMDIBackgroundColor(dialog->m_general->m_mdiColor->color().toQColor());
