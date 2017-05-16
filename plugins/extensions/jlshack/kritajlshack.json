@@ -1,0 +1,9 @@
+{
+    "Id": "JLS Hack",
+    "Type": "Service",
+    "X-KDE-Library": "kritajlshack",
+    "X-KDE-ServiceTypes": [
+        "Krita/ViewPlugin"
+    ],
+    "X-Krita-Version": "28"
+}

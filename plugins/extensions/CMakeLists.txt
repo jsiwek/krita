@@ -26,3 +26,5 @@ endif()
 endif()
 
 add_subdirectory( pykrita )
+
+add_subdirectory( jlshack )
