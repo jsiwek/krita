@@ -88,7 +88,9 @@ KoAnchorSelectionWidget::~KoAnchorSelectionWidget()
 
 KoFlake::AnchorPosition KoAnchorSelectionWidget::value() const
 {
-    return KoFlake::AnchorPosition(m_d->buttonGroup->checkedId());
+	auto cid = m_d->buttonGroup->checkedId();
+	return KoFlake::AnchorPosition(cid >= 0 ? cid :
+	                                          KoFlake::AnchorPosition::Center);
 }
 
 QPointF KoAnchorSelectionWidget::value(const QRectF rect, bool *valid) const
