@@ -17,6 +17,7 @@ private Q_SLOTS:
 
 	void AutonameLayerChildren();
 	void ExportLayerChildren();
+	void QuickExportLayer();
 };
 
 #endif

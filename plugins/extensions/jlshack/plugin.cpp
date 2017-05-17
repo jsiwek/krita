@@ -1,16 +1,31 @@
 #include "plugin.h"
-#include "kpluginfactory.h"
 
-#include "Krita.h"
+#include "kpluginfactory.h"
+#include "kundo2stack.h"
+
+#include "kis_node_manager.h"
+#include "kis_node.h"
+#include "kis_paint_layer.h"
+#include "kis_painter.h"
+#include "kis_image.h"
+#include "kis_group_layer.h"
+
 #include "KisPart.h"
 #include "KisViewManager.h"
 #include "KisDocument.h"
-#include "kis_node_manager.h"
-#include "kis_node.h"
-#include "kundo2stack.h"
+#include "KisMimeDatabase.h"
 
-#include <memory>
+#include "KoProgressBar.h"
+
+#include "Krita.h"
+
+#include "qfileinfo.h"
+#include "qjsondocument.h"
+#include "qjsonobject.h"
+#include "qjsonarray.h"
+
 #include <string>
+#include <memory>
 
 K_PLUGIN_FACTORY_WITH_JSON(KritaJLSHackPluginFactory, "kritajlshack.json",
                            registerPlugin<KritaJLSHackPlugin>();)
@@ -18,16 +33,20 @@ K_PLUGIN_FACTORY_WITH_JSON(KritaJLSHackPluginFactory, "kritajlshack.json",
 KritaJLSHackPlugin::KritaJLSHackPlugin(QObject *parent, const QVariantList &)
     : KisViewPlugin(parent)
 	{
-    qInfo() << "Loading JLS Hack plugin";
+	qInfo() << "Loading JLS Hack plugin";
 	auto k = Krita::instance();
 
-	auto action = k->createAction("Autoname layers children");
+	auto action = k->createAction("Autoname children");
 	connect(action, SIGNAL(triggered(bool)),
 	        this, SLOT(AutonameLayerChildren()));
 
-	action = k->createAction("Export selected layer children");
+	action = k->createAction("Export children");
 	connect(action, SIGNAL(triggered(bool)),
 	        this, SLOT(ExportLayerChildren()));
+
+	action = k->createAction("Quick export layer(s)");
+	connect(action, SIGNAL(triggered(bool)),
+	        this, SLOT(QuickExportLayer()));
 	}
 
 static KisDocument* current_document()
@@ -164,8 +183,150 @@ void KritaJLSHackPlugin::AutonameLayerChildren()
 
 void KritaJLSHackPlugin::ExportLayerChildren()
 	{
-	// @todo: iterate over selected layers
 	qInfo() << "Export layer children";
+
+	auto doc = current_document();
+	auto file_info = QFileInfo(doc->url().toLocalFile());
+	QString mime = "image/png";
+	QString file_ext = KisMimeDatabase::suffixesForMimeType(mime).first();
+	QString file_path = file_info.absolutePath();
+	QString file_basename = file_info.baseName();
+	KisImageSP image = doc->image();
+	QRect r = image->bounds();
+
+	auto nodes = selected_nodes();
+	auto num_docs = 0;
+	auto doc_num = 0;
+
+	for ( auto n : nodes )
+		for ( auto i = 0u; i < n->childCount(); ++i )
+			if ( n->at(i)->visible() )
+				++num_docs;
+
+	KoProgressBar progress;
+	progress.setRange(0, num_docs);
+
+	for ( auto n : nodes )
+		{
+		qInfo() << "  export children of layer: " << n->name();
+		QJsonArray parts;
+
+		for ( auto i = 0u; i < n->childCount(); ++i )
+			{
+			auto child = n->at(i);
+
+			if ( ! child->visible() )
+				{
+				qInfo() << "    skip invisible layer: " << child->name();
+				continue;
+				}
+
+			qInfo() << "    export layer: " << child->name();
+
+			std::unique_ptr<KisDocument> export_doc{
+				KisPart::instance()->createDocument()};
+
+			KisImageSP dst = new KisImage(export_doc->createUndoStore(),
+			                              r.width(), r.height(),
+			                              image->colorSpace(), child->name());
+			dst->setResolution(image->xRes(), image->yRes());
+
+			export_doc->setCurrentImage(dst);
+			export_doc->setOutputMimeType(mime.toLatin1());
+			export_doc->setFileBatchMode(true);
+
+			KisPaintLayer* paintLayer = new KisPaintLayer(dst,
+			                                              "projection",
+			                                              child->opacity());
+			KisPainter gc(paintLayer->paintDevice());
+			gc.bitBlt(QPoint(0, 0), child->projection(), r);
+			dst->addNode(paintLayer, dst->rootLayer(), KisLayerSP(0));
+			dst->refreshGraph();
+
+			QRect cropRect = child->projection()->nonDefaultPixelArea();
+
+			if ( ! cropRect.isEmpty() )
+				export_doc->image()->cropImage(cropRect);
+
+			qInfo() << "      crop rect: " << cropRect;
+
+			QString path = file_path + "/" + file_basename + "_" +
+			               child->name().replace(' ', '_') + '.' + file_ext;
+			QUrl url = QUrl::fromLocalFile(path);
+			export_doc->exportDocument(url);
+
+			QJsonObject part;
+			part["file"] = url.fileName();
+			part["name"] = child->name();
+			part["offsetX"] = cropRect.topLeft().x();
+			part["offsetY"] = cropRect.topLeft().y();
+			part["sizeX"] = cropRect.width();
+			part["sizeY"] = cropRect.height();
+			parts.push_back(part);
+			progress.setValue(++doc_num);
+			}
+
+		QJsonObject json;
+		json["parts"] = parts;
+		QJsonDocument json_doc{json};
+
+		QString json_path = file_path + "/" + file_basename + "_" +
+		                    n->name().replace(' ', '_') + ".json";
+		QFile json_file;
+		json_file.setFileName(json_path);
+		json_file.open(QFile::WriteOnly);
+		json_file.write(json_doc.toJson());
+		}
+	}
+
+void KritaJLSHackPlugin::QuickExportLayer()
+	{
+	qInfo() << "Quick export layers";
+
+	auto doc = current_document();
+	auto file_info = QFileInfo(doc->url().toLocalFile());
+	QString mime = "image/png";
+	QString file_ext = KisMimeDatabase::suffixesForMimeType(mime).first();
+	QString file_path = file_info.absolutePath();
+	QString file_basename = file_info.baseName();
+	KisImageSP image = doc->image();
+	QRect r = image->bounds();
+
+	auto nodes = selected_nodes();
+	KoProgressBar progress;
+	progress.setRange(0, nodes.size());
+	auto doc_num = 0;
+
+	for ( auto n : nodes )
+		{
+		qInfo() << "    export layer: " << n->name();
+
+		std::unique_ptr<KisDocument> export_doc{
+			KisPart::instance()->createDocument()};
+
+		KisImageSP dst = new KisImage(export_doc->createUndoStore(),
+		                  r.width(), r.height(),
+		                  image->colorSpace(), n->name());
+		dst->setResolution(image->xRes(), image->yRes());
+
+		export_doc->setCurrentImage(dst);
+		export_doc->setOutputMimeType(mime.toLatin1());
+		export_doc->setFileBatchMode(true);
+
+		KisPaintLayer* paintLayer = new KisPaintLayer(dst,
+		                          "projection",
+		                          n->opacity());
+		KisPainter gc(paintLayer->paintDevice());
+		gc.bitBlt(QPoint(0, 0), n->projection(), r);
+		dst->addNode(paintLayer, dst->rootLayer(), KisLayerSP(0));
+		dst->refreshGraph();
+
+		QString path = file_path + "/" + file_basename + "_" +
+		           n->name().replace(' ', '_') + '.' + file_ext;
+		QUrl url = QUrl::fromLocalFile(path);
+		export_doc->exportDocument(url);
+		progress.setValue(++doc_num);
+		}
 	}
 
 #include "plugin.moc"
