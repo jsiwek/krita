@@ -262,11 +262,16 @@ void KritaJLSHackPlugin::ExportLayerChildren()
 			part["offsetY"] = cropRect.topLeft().y();
 			part["sizeX"] = cropRect.width();
 			part["sizeY"] = cropRect.height();
+			part["order"] = child->parent()->index(child);
 			parts.push_back(part);
 			progress.setValue(++doc_num);
 			}
 
 		QJsonObject json;
+		json["name"] = n->name();
+		json["origX"] = r.width();
+		json["origY"] = r.height();
+		json["order"] = n->parent()->index(n);
 		json["parts"] = parts;
 		QJsonDocument json_doc{json};
 
