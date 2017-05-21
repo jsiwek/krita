@@ -5,6 +5,8 @@
 
 #include "kis_node_manager.h"
 #include "kis_node.h"
+#include "kis_mask.h"
+#include "kis_effect_mask.h"
 #include "kis_paint_layer.h"
 #include "kis_painter.h"
 #include "kis_image.h"
@@ -116,6 +118,13 @@ struct AutonameUndoCommand : public KUndo2Command {
 				num.setNum(i);
 				new_name += num;
 				an.new_names.emplace_back(new_name.toStdString());
+
+				if ( dynamic_cast<KisMask*>(child.data() ) )
+					{
+					qInfo() << "    " << child->name() << " -> " << "<skipped>";
+					continue;
+					}
+
 				qInfo() << "    " << child->name() << " -> " << new_name;
 				}
 
@@ -129,7 +138,14 @@ struct AutonameUndoCommand : public KUndo2Command {
 		{
 		for ( auto n : nodes )
 			for ( auto i = 0u; i < n.children.size(); ++i )
-				n.children[i]->setName(n.old_names[i].c_str());
+				{
+				auto child = n.children[i];
+
+				if ( dynamic_cast<KisMask*>(child.data() ) )
+					continue;
+
+				child->setName(n.old_names[i].c_str());
+				}
 
 		if ( ! was_modified )
 			doc->setModified(false);
@@ -139,7 +155,14 @@ struct AutonameUndoCommand : public KUndo2Command {
 		{
 		for ( auto n : nodes )
 			for ( auto i = 0u; i < n.children.size(); ++i )
-				n.children[i]->setName(n.new_names[i].c_str());
+				{
+				auto child = n.children[i];
+
+				if ( dynamic_cast<KisMask*>(child.data() ) )
+					continue;
+
+				child->setName(n.new_names[i].c_str());
+				}
 
 		doc->setModified(true);
 		}
@@ -211,6 +234,19 @@ void KritaJLSHackPlugin::ExportLayerChildren()
 		qInfo() << "  export children of layer: " << n->name();
 		QJsonArray parts;
 
+		auto layer = dynamic_cast<KisLayer*>(n.data());
+
+		if ( ! layer )
+			{
+			qInfo() << "  skipped, not a layer: " << n->name();
+			continue;
+			}
+
+		auto effects = layer->effectMasks();
+
+		for ( auto e : effects )
+			qInfo() << "    found effect:" << e->name();
+
 		for ( auto i = 0u; i < n->childCount(); ++i )
 			{
 			auto child = n->at(i);
@@ -218,6 +254,12 @@ void KritaJLSHackPlugin::ExportLayerChildren()
 			if ( ! child->visible() )
 				{
 				qInfo() << "    skip invisible layer: " << child->name();
+				continue;
+				}
+
+			if ( dynamic_cast<KisMask*>(child.data() ) )
+				{
+				qInfo() << "    skip mask layer: " << child->name();
 				continue;
 				}
 
@@ -241,6 +283,13 @@ void KritaJLSHackPlugin::ExportLayerChildren()
 			KisPainter gc(paintLayer->paintDevice());
 			gc.bitBlt(QPoint(0, 0), child->projection(), r);
 			dst->addNode(paintLayer, dst->rootLayer(), KisLayerSP(0));
+
+			for ( auto e : effects )
+				{
+				auto clone = e->clone();
+				dst->addNode(clone, paintLayer);
+				}
+
 			dst->refreshGraph();
 
 			QRect cropRect = child->projection()->nonDefaultPixelArea();
