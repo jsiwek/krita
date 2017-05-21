@@ -277,22 +277,24 @@ void KritaJLSHackPlugin::ExportLayerChildren()
 			export_doc->setOutputMimeType(mime.toLatin1());
 			export_doc->setFileBatchMode(true);
 
+			KisGroupLayer* groupLayer = new KisGroupLayer(dst, "group",
+			                                              n->opacity());
 			KisPaintLayer* paintLayer = new KisPaintLayer(dst,
-			                                              "projection",
+			                                              "paint",
 			                                              child->opacity());
 			KisPainter gc(paintLayer->paintDevice());
 			gc.bitBlt(QPoint(0, 0), child->projection(), r);
-			dst->addNode(paintLayer, dst->rootLayer(), KisLayerSP(0));
-
-			for ( auto e : effects )
-				{
-				auto clone = e->clone();
-				dst->addNode(clone, paintLayer);
-				}
-
+			dst->addNode(groupLayer, dst->rootLayer(), KisLayerSP(0));
+			dst->addNode(paintLayer, groupLayer, KisLayerSP(0));
 			dst->refreshGraph();
 
-			QRect cropRect = child->projection()->nonDefaultPixelArea();
+			QRect cropRect = paintLayer->projection()->nonDefaultPixelArea();
+
+			for ( auto e : effects )
+				e->apply(paintLayer->paintDevice(), cropRect, cropRect,
+				         KisNode::N_FILTHY);
+
+			dst->refreshGraph();
 
 			if ( ! cropRect.isEmpty() )
 				export_doc->image()->cropImage(cropRect);
