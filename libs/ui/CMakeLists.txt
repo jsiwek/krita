@@ -224,7 +224,9 @@ set(kritaui_LIB_SRCS
     widgets/kis_paintop_presets_popup.cpp
     widgets/kis_tool_options_popup.cpp
     widgets/kis_paintop_presets_chooser_popup.cpp
+    widgets/kis_paintop_presets_save.cpp
     widgets/kis_pattern_chooser.cc
+
     widgets/kis_popup_button.cc
     widgets/kis_preset_chooser.cpp
     widgets/kis_progress_widget.cpp
@@ -281,6 +283,7 @@ set(kritaui_LIB_SRCS
     input/kis_stroke_shortcut.cpp
     input/kis_shortcut_matcher.cpp
     input/kis_select_layer_action.cpp
+    input/KisQtWidgetsTweaker.cpp
 
     operations/kis_operation.cpp
     operations/kis_operation_configuration.cpp
@@ -317,7 +320,7 @@ set(kritaui_LIB_SRCS
     canvas/kis_mirror_axis.cpp
 
     kis_abstract_perspective_grid.cpp
-
+    
     KisApplication.cpp
     KisAutoSaveRecoveryDialog.cpp
     KisDetailsPane.cpp
@@ -330,6 +333,7 @@ set(kritaui_LIB_SRCS
     KisImportExportFilter.cpp
     KisFilterEntry.cpp
     KisImportExportManager.cpp
+    KisImportExportUtils.cpp
     kis_async_action_feedback.cpp
     KisMainWindow.cpp
     KisOpenPane.cpp
@@ -382,6 +386,7 @@ if(WIN32)
         input/wintab/kis_tablet_support_win.cpp
         input/wintab/kis_screen_size_choice_dialog.cpp
         qtlockedfile/qtlockedfile_win.cpp
+        input/wintab/kis_tablet_support_win8.cpp
         )
     include_directories(${Qt5Gui_PRIVATE_INCLUDE_DIRS})
 endif()
@@ -419,6 +424,7 @@ endif()
 
 ki18n_wrap_ui(kritaui_LIB_SRCS
     widgets/KoFillConfigWidget.ui
+    widgets/KoStrokeConfigWidget.ui
     forms/wdgdlgpngimport.ui
     forms/wdgfullscreensettings.ui
     forms/wdgautogradient.ui
@@ -454,6 +460,7 @@ ki18n_wrap_ui(kritaui_LIB_SRCS
     forms/wdgmultipliersdoublesliderspinbox.ui
     forms/wdgnodequerypatheditor.ui
     forms/wdgpresetselectorstrip.ui
+    forms/wdgsavebrushpreset.ui
     forms/wdgdlgblacklistcleanup.ui
     forms/wdgrectangleconstraints.ui
     forms/wdgimportimagesequence.ui

@@ -11,6 +11,10 @@ project (krita-and-all-its-deps)
 
 cmake_minimum_required(VERSION 2.8.6)
 
+if(NOT SUBMAKE_JOBS)
+	set(SUBMAKE_JOBS 1)
+endif(NOT SUBMAKE_JOBS)
+
 if (CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
 	message(FATAL_ERROR "Compiling in the source directory is not supported. Use for example 'mkdir build; cd build; cmake ..'.")
 endif (CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
@@ -46,6 +50,37 @@ message( STATUS "CMAKE_CL_64: ${CMAKE_CL_64}")
 
 set(GLOBAL_BUILD_TYPE RelWithDebInfo)
 set(GLOBAL_PROFILE ${GLOBAL_PROFILE} -DBUILD_TESTING=false)
+
+if (MINGW)
+	option(QT_ENABLE_DEBUG_INFO "Build Qt with debug info included" OFF)
+endif (MINGW)
+
+set(SECURITY_EXE_LINKER_FLAGS "")
+set(SECURITY_SHARED_LINKER_FLAGS "")
+set(SECURITY_MODULE_LINKER_FLAGS "")
+if (MINGW)
+	option(USE_MINGW_HARDENING_LINKER "Enable DEP (NX), ASLR and high-entropy ASLR linker flags (mingw-w64)" ON)
+	if (USE_MINGW_HARDENING_LINKER)
+		set(SECURITY_EXE_LINKER_FLAGS "-Wl,--dynamicbase -Wl,--nxcompat -Wl,--disable-auto-image-base")
+		set(SECURITY_SHARED_LINKER_FLAGS "-Wl,--dynamicbase -Wl,--nxcompat -Wl,--disable-auto-image-base")
+		set(SECURITY_MODULE_LINKER_FLAGS "-Wl,--dynamicbase -Wl,--nxcompat -Wl,--disable-auto-image-base")
+		if ("${CMAKE_SIZEOF_VOID_P}" EQUAL "8")
+			# Enable high-entropy ASLR for 64-bit
+			# The image base has to be >4GB for HEASLR to be enabled.
+			# The values used here are kind of arbitrary.
+			set(SECURITY_EXE_LINKER_FLAGS "${SECURITY_EXE_LINKER_FLAGS} -Wl,--high-entropy-va -Wl,--image-base,0x140000000")
+			set(SECURITY_SHARED_LINKER_FLAGS "${SECURITY_SHARED_LINKER_FLAGS} -Wl,--high-entropy-va -Wl,--image-base,0x180000000")
+			set(SECURITY_MODULE_LINKER_FLAGS "${SECURITY_MODULE_LINKER_FLAGS} -Wl,--high-entropy-va -Wl,--image-base,0x180000000")
+			set(GLOBAL_PROFILE ${GLOBAL_PROFILE}
+				-DCMAKE_EXE_LINKER_FLAGS=${SECURITY_EXE_LINKER_FLAGS}
+				-DCMAKE_SHARED_LINKER_FLAGS=${SECURITY_SHARED_LINKER_FLAGS}
+				-DCMAKE_MODULE_LINKER_FLAGS=${SECURITY_MODULE_LINKER_FLAGS}
+			)
+		endif ("${CMAKE_SIZEOF_VOID_P}" EQUAL "8")
+	else (USE_MINGW_HARDENING_LINKER)
+		message(WARNING "Linker Security Flags not enabled!")
+	endif (USE_MINGW_HARDENING_LINKER)
+endif (MINGW)
 
 if (DEFINED EP_PREFIX)
 	set_directory_properties(PROPERTIES EP_PREFIX ${EP_PREFIX})

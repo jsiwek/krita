@@ -52,7 +52,7 @@ KoColorSpaceFactory::~KoColorSpaceFactory()
         it != d->stackInformation.constEnd(); ++it)
     {
         errorPigment << "*******************************************";
-        errorPigment << it.key()->id() << " still in used, and grabed in: ";
+        errorPigment << it.key()->id() << " still in used, and grabbed in: ";
         errorPigment << it.value();
     }
     if( count != d->colorspaces.size())
@@ -71,15 +71,15 @@ KoColorSpaceFactory::~KoColorSpaceFactory()
     delete d;
 }
 
-const KoColorProfile* KoColorSpaceFactory::colorProfile(const QByteArray& rawData) const
+const KoColorProfile *KoColorSpaceFactory::colorProfile(const QByteArray &rawData, KoColorSpaceFactory::ProfileRegistrationInterface *registrationInterface) const
 {
     KoColorProfile* colorProfile = createColorProfile(rawData);
     if (colorProfile && colorProfile->valid()) {
-        if (const KoColorProfile* existingProfile = KoColorSpaceRegistry::instance()->profileByName(colorProfile->name())) {
+        if (const KoColorProfile* existingProfile = registrationInterface->profileByName(colorProfile->name())) {
             delete colorProfile;
             return existingProfile;
         }
-        KoColorSpaceRegistry::instance()->addProfile(colorProfile);
+        registrationInterface->registerNewProfile(colorProfile);
         d->colorprofiles.append(colorProfile);
     }
     return colorProfile;

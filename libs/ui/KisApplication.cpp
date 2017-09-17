@@ -87,6 +87,8 @@
 #include "opengl/kis_opengl.h"
 #include "kis_spin_box_unit_manager.h"
 #include "kis_document_aware_spin_box_unit_manager.h"
+#include "KisViewManager.h"
+#include "kis_workspace_resource.h"
 
 #include <KritaVersionWrapper.h>
 namespace {
@@ -246,6 +248,7 @@ void KisApplication::addResourceTypes()
     KoResourcePaths::addResourceType("tags", "data", "/tags/");
     KoResourcePaths::addResourceType("templates", "data", "/templates");
     KoResourcePaths::addResourceType("pythonscripts", "data", "/pykrita");
+    KoResourcePaths::addResourceType("symbols", "data", "/symbols");
 
     //    // Extra directories to look for create resources. (Does anyone actually use that anymore?)
     //    KoResourcePaths::addResourceDir("ko_gradients", "/usr/share/create/gradients/gimp");
@@ -269,6 +272,8 @@ void KisApplication::addResourceTypes()
     d.mkpath(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/taskset/");
     d.mkpath(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/workspaces/");
     d.mkpath(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/input/");
+    d.mkpath(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/pykrita/");
+    d.mkpath(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/symbols/");
 }
 
 void KisApplication::loadResources()
@@ -295,6 +300,11 @@ void KisApplication::loadResources()
     setSplashScreenLoadingText(i18n("Loading Paint Operations..."));
     processEvents();
     KisResourceServerProvider::instance()->paintOpPresetServer(true);
+
+    // load symbols
+    setSplashScreenLoadingText(i18n("Loading SVG Symbol Collections..."));
+    processEvents();
+    KoResourceServerProvider::instance()->svgSymbolCollectionServer(true);
 
     setSplashScreenLoadingText(i18n("Loading Resource Bundles..."));
     processEvents();
@@ -392,7 +402,6 @@ bool KisApplication::start(const KisApplicationArguments &args)
     Digikam::ThemeManager themeManager;
     themeManager.setCurrentTheme(group.readEntry("Theme", "Krita dark"));
 
-
     ResetStarting resetStarting(d->splashScreen, args.filenames().count()); // remove the splash when done
     Q_UNUSED(resetStarting);
 
@@ -415,6 +424,19 @@ bool KisApplication::start(const KisApplicationArguments &args)
 
         if (showmainWindow) {
             m_mainWindow->initializeGeometry();
+
+            if (!args.workspace().isEmpty()) {
+                KoResourceServer<KisWorkspaceResource> * rserver = KisResourceServerProvider::instance()->workspaceServer();
+                KisWorkspaceResource* workspace = rserver->resourceByName(args.workspace());
+                if (workspace) {
+                    m_mainWindow->restoreWorkspace(workspace->dockerState());
+                }
+            }
+
+            if (args.canvasOnly()) {
+                m_mainWindow->viewManager()->switchCanvasOnly(true);
+            }
+
             m_mainWindow->show();
         }
     }
@@ -467,17 +489,15 @@ bool KisApplication::start(const KisApplicationArguments &args)
                     qApp->processEvents(); // For vector layers to be updated
 
                     doc->setFileBatchMode(true);
-                    doc->setOutputMimeType(outputMimetype.toLatin1());
-                    if (!doc->exportDocument(QUrl::fromLocalFile(exportFileName))) {
+                    if (!doc->exportDocumentSync(QUrl::fromLocalFile(exportFileName), outputMimetype.toLatin1())) {
                         dbgKrita << "Could not export " << fileName << "to" << exportFileName << ":" << doc->errorMessage();
                     }
                     nPrinted++;
                     QTimer::singleShot(0, this, SLOT(quit()));
                 }
                 else if (m_mainWindow) {
-                    KisDocument *doc = KisPart::instance()->createDocument();
-                    doc->setFileBatchMode(m_batchRun);
-                    if (m_mainWindow->openDocumentInternal(QUrl::fromLocalFile(fileName), doc)) {
+                    KisMainWindow::OpenFlags flags = m_batchRun ? KisMainWindow::BatchMode : KisMainWindow::None;
+                    if (m_mainWindow->openDocument(QUrl::fromLocalFile(fileName), flags)) {
                         if (print) {
                             m_mainWindow->slotFilePrint();
                             nPrinted++;
@@ -586,9 +606,8 @@ void KisApplication::remoteArguments(QByteArray message, QObject *socket)
                 createNewDocFromTemplate(filename, mw);
             }
             else if (QFile(filename).exists()) {
-                KisDocument *doc = KisPart::instance()->createDocument();
-                doc->setFileBatchMode(m_batchRun);
-                mw->openDocumentInternal(QUrl::fromLocalFile(filename), doc);
+                KisMainWindow::OpenFlags flags = m_batchRun ? KisMainWindow::BatchMode : KisMainWindow::None;
+                mw->openDocument(QUrl::fromLocalFile(filename), flags);
             }
         }
     }
@@ -598,9 +617,8 @@ void KisApplication::fileOpenRequested(const QString &url)
 {
     KisMainWindow *mainWindow = KisPart::instance()->mainWindows().first();
     if (mainWindow) {
-        KisDocument *doc = KisPart::instance()->createDocument();
-        doc->setFileBatchMode(m_batchRun);
-        mainWindow->openDocumentInternal(QUrl::fromLocalFile(url), doc);
+        KisMainWindow::OpenFlags flags = m_batchRun ? KisMainWindow::BatchMode : KisMainWindow::None;
+        mainWindow->openDocument(QUrl::fromLocalFile(url), flags);
     }
 }
 
@@ -622,40 +640,39 @@ void KisApplication::checkAutosaveFiles()
 #endif
 
     // all autosave files for our application
-    m_autosaveFiles = dir.entryList(filters, QDir::Files | QDir::Hidden);
+    QStringList autosaveFiles = dir.entryList(filters, QDir::Files | QDir::Hidden);
 
     // Allow the user to make their selection
-    if (m_autosaveFiles.size() > 0) {
+    if (autosaveFiles.size() > 0) {
         if (d->splashScreen) {
             // hide the splashscreen to see the dialog
             d->splashScreen->hide();
         }
-        m_autosaveDialog = new KisAutoSaveRecoveryDialog(m_autosaveFiles, activeWindow());
+        m_autosaveDialog = new KisAutoSaveRecoveryDialog(autosaveFiles, activeWindow());
         QDialog::DialogCode result = (QDialog::DialogCode) m_autosaveDialog->exec();
 
         if (result == QDialog::Accepted) {
             QStringList filesToRecover = m_autosaveDialog->recoverableFiles();
-            Q_FOREACH (const QString &autosaveFile, m_autosaveFiles) {
+            Q_FOREACH (const QString &autosaveFile, autosaveFiles) {
                 if (!filesToRecover.contains(autosaveFile)) {
                     QFile::remove(dir.absolutePath() + "/" + autosaveFile);
                 }
             }
-            m_autosaveFiles = filesToRecover;
+            autosaveFiles = filesToRecover;
         } else {
-            m_autosaveFiles.clear();
+            autosaveFiles.clear();
         }
 
-        if (m_autosaveFiles.size() > 0) {
+        if (autosaveFiles.size() > 0) {
             QList<QUrl> autosaveUrls;
-            Q_FOREACH (const QString &autoSaveFile, m_autosaveFiles) {
+            Q_FOREACH (const QString &autoSaveFile, autosaveFiles) {
                 const QUrl url = QUrl::fromLocalFile(dir.absolutePath() + QLatin1Char('/') + autoSaveFile);
                 autosaveUrls << url;
             }
             if (m_mainWindow) {
                 Q_FOREACH (const QUrl &url, autosaveUrls) {
-                    KisDocument *doc = KisPart::instance()->createDocument();
-                    doc->setFileBatchMode(m_batchRun);
-                    m_mainWindow->openDocumentInternal(url, doc);
+                    KisMainWindow::OpenFlags flags = m_batchRun ? KisMainWindow::BatchMode : KisMainWindow::None;
+                    m_mainWindow->openDocument(url, flags | KisMainWindow::RecoveryFile);
                 }
             }
         }
@@ -703,11 +720,8 @@ bool KisApplication::createNewDocFromTemplate(const QString &fileName, KisMainWi
         QUrl templateURL;
         templateURL.setPath(templateBase.adjusted(QUrl::RemoveFilename|QUrl::StripTrailingSlash).path() + '/' + templateName);
 
-        KisDocument *doc = KisPart::instance()->createDocument();
-        doc->setFileBatchMode(m_batchRun);
-        if (mainWindow->openDocumentInternal(templateURL, doc)) {
-            doc->resetURL();
-            doc->setTitleModified();
+        KisMainWindow::OpenFlags batchFlags = m_batchRun ? KisMainWindow::BatchMode : KisMainWindow::None;
+        if (mainWindow->openDocument(templateURL, KisMainWindow::Import | batchFlags)) {
             dbgUI << "Template loaded...";
             return true;
         }

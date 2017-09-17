@@ -38,17 +38,26 @@ KritaJLSHackPlugin::KritaJLSHackPlugin(QObject *parent, const QVariantList &)
 	qInfo() << "Loading JLS Hack plugin";
 	auto k = Krita::instance();
 
-	auto action = k->createAction("Autoname children");
+	{
+	auto name = "Autoname children";
+	auto action = k->createAction(name, name);
 	connect(action, SIGNAL(triggered(bool)),
 	        this, SLOT(AutonameLayerChildren()));
+	}
 
-	action = k->createAction("Export children");
+	{
+	auto name = "Export children";
+	auto action = k->createAction(name, name);
 	connect(action, SIGNAL(triggered(bool)),
 	        this, SLOT(ExportLayerChildren()));
+	}
 
-	action = k->createAction("Quick export layer(s)");
+	{
+	auto name = "Quick export layers(s)";
+	auto action = k->createAction(name, name);
 	connect(action, SIGNAL(triggered(bool)),
 	        this, SLOT(QuickExportLayer()));
+	}
 	}
 
 static KisDocument* current_document()
@@ -274,7 +283,7 @@ void KritaJLSHackPlugin::ExportLayerChildren()
 			dst->setResolution(image->xRes(), image->yRes());
 
 			export_doc->setCurrentImage(dst);
-			export_doc->setOutputMimeType(mime.toLatin1());
+			export_doc->setMimeType(mime.toLatin1());
 			export_doc->setFileBatchMode(true);
 
 			KisGroupLayer* groupLayer = new KisGroupLayer(dst, "group",
@@ -304,7 +313,7 @@ void KritaJLSHackPlugin::ExportLayerChildren()
 			QString path = file_path + "/" + file_basename + "_" +
 			               child->name().replace(' ', '_') + '.' + file_ext;
 			QUrl url = QUrl::fromLocalFile(path);
-			export_doc->exportDocument(url);
+			export_doc->exportDocument(url, mime.toLatin1());
 
 			QJsonObject part;
 			part["file"] = url.fileName();
@@ -366,7 +375,7 @@ void KritaJLSHackPlugin::QuickExportLayer()
 		dst->setResolution(image->xRes(), image->yRes());
 
 		export_doc->setCurrentImage(dst);
-		export_doc->setOutputMimeType(mime.toLatin1());
+		export_doc->setMimeType(mime.toLatin1());
 		export_doc->setFileBatchMode(true);
 
 		KisPaintLayer* paintLayer = new KisPaintLayer(dst,
@@ -380,7 +389,7 @@ void KritaJLSHackPlugin::QuickExportLayer()
 		QString path = file_path + "/" + file_basename + "_" +
 		           n->name().replace(' ', '_') + '.' + file_ext;
 		QUrl url = QUrl::fromLocalFile(path);
-		export_doc->exportDocument(url);
+		export_doc->exportDocument(url, mime.toLatin1());
 		progress.setValue(++doc_num);
 		}
 	}

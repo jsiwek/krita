@@ -71,7 +71,8 @@ void KisToolShape::activate(ToolActivation toolActivation, const QSet<KoShape*> 
 
 int KisToolShape::flags() const
 {
-    return KisTool::FLAG_USES_CUSTOM_COMPOSITEOP|KisTool::FLAG_USES_CUSTOM_PRESET;
+    return KisTool::FLAG_USES_CUSTOM_COMPOSITEOP|KisTool::FLAG_USES_CUSTOM_PRESET
+           |KisTool::FLAG_USES_CUSTOM_SIZE;
 }
 
 QWidget * KisToolShape::createOptionWidget()
@@ -201,7 +202,8 @@ void KisToolShape::addPathShape(KoPathShape* pathShape, const KUndo2MagicString&
     // Recorde the paint action
     KisRecordedPathPaintAction bezierCurvePaintAction(
             KisNodeQueryPath::absolutePath(node),
-            preset );
+            preset,
+            KisDistanceInitInfo());
     bezierCurvePaintAction.setPaintColor(currentFgColor());
     QPointF lastPoint, nextPoint;
     int elementCount = mapedOutline.elementCount();
